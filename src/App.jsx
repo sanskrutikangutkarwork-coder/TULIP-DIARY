@@ -37,6 +37,47 @@ const fmtDT=ms=>new Date(ms).toLocaleString("en-IN",{dateStyle:"medium",timeStyl
 const fmtTime=v=>{ try{ return new Date(v).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}catch{return v}};
 const genCode=()=>Math.random().toString(36).slice(2,8).toUpperCase();
 
+/* ─── EmailJS Config ──────────────────────────────────────────────────────
+   FREE email service — sends registration alerts to Sanskruti's Gmail
+   Setup instructions in README. Replace with your own EmailJS keys.
+───────────────────────────────────────────────────────────────────────── */
+const OWNER_EMAIL = "sanskrutikangutkar.work@gmail.com";
+const EMAILJS_SERVICE_ID  = "service_sz8t98s";   // 🔧 Replace after EmailJS setup
+const EMAILJS_TEMPLATE_ID = "template_bulkkyg";  // 🔧 Replace after EmailJS setup
+const EMAILJS_PUBLIC_KEY  = "yAavuC-ELtr2o6J0q";   // 🔧 Replace after EmailJS setup
+
+// Load EmailJS SDK once
+function loadEmailJS(){
+  if(window.emailjs) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+    s.onload=()=>{window.emailjs.init(EMAILJS_PUBLIC_KEY);res()};
+    s.onerror=rej;
+    document.head.appendChild(s);
+  });
+}
+
+// Send registration alert email to Sanskruti
+async function sendRegistrationEmail({name, career, email, phone, accessCode}){
+  try{
+    await loadEmailJS();
+    await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:   OWNER_EMAIL,
+      from_name:  name,
+      user_career: career,
+      user_email: email||"Not provided",
+      user_phone: phone||"Not provided",
+      access_code: accessCode,
+      request_time: new Date().toLocaleString("en-IN"),
+    });
+    console.log("✅ Registration email sent to Sanskruti!");
+  } catch(err){
+    console.warn("Email send failed (EmailJS not configured yet):", err);
+  }
+}
+
+
 /* ─── Themes ──────────────────────────────────────────────────────────────*/
 const THEMES=[
   {name:"Tulip Pink",  bg:"linear-gradient(145deg,#0f0318 0%,#1e0530 40%,#0a0118 100%)",accent:"#f472b6",accent2:"#fbbfe8",card:"rgba(30,5,48,.92)",text:"#fff0fa",muted:"#906080",border:"rgba(244,114,182,.22)",green:"#4ade80",red:"#f87171",teal:"#5eead4"},
@@ -117,7 +158,10 @@ function SplashScreen({T}){
 /* ══════════════════════════════════════════════════════════════════════════ GATE */
 function GateScreen({T,themeIdx,saveTheme,onLogin}){
   const owner=S.get("tlp_owner",null);
+  const MASTER_KEY="TULIP2025Sanskruti";
   const [mode,setMode]=useState(owner?"login":"ownerSetup");
+  const [masterInput,setMasterInput]=useState("");
+  const [masterUnlocked,setMasterUnlocked]=useState(false);
   const [toast,setToast]=useState(null);
   const showToast=(m,c="#4ade80")=>{setToast({m,c});setTimeout(()=>setToast(null),3500)};
   const bgRef=useRef();
@@ -148,7 +192,18 @@ function GateScreen({T,themeIdx,saveTheme,onLogin}){
           <p style={{color:T.muted,fontSize:10,fontWeight:700,letterSpacing:1}}>by Sanskruti Kangutkar</p>
         </div>
 
-        {mode==="ownerSetup"&&<OwnerSetupFlow T={T} showToast={showToast} onDone={o=>{S.set("tlp_owner",o);onLogin(o)}}/>}
+        {mode==="ownerSetup"&&!masterUnlocked&&(
+          <div style={{background:T.card,backdropFilter:"blur(24px)",border:`2px solid ${T.border}`,borderRadius:22,padding:28}}>
+            <div style={{textAlign:"center",marginBottom:16}}><TulipLogo size={50} glow/></div>
+            <h3 style={{fontFamily:"'Bangers',cursive",color:T.accent2,fontSize:22,letterSpacing:2,marginBottom:8,textAlign:"center"}}>👑 OWNER SETUP</h3>
+            <p style={{color:T.muted,fontSize:13,fontWeight:700,marginBottom:6,textAlign:"center"}}>This is only for <span style={{color:T.accent}}>Sanskruti Kangutkar</span>.</p>
+            <p style={{color:T.muted,fontSize:12,fontWeight:700,marginBottom:14,textAlign:"center"}}>If you are not the owner, please click Register below.</p>
+            <input type="password" value={masterInput} onChange={e=>setMasterInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(masterInput===MASTER_KEY?setMasterUnlocked(true):showToast("❌ Wrong key!","#f87171"))} placeholder="Enter secret master key..." style={{display:"block",width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.07)",border:`2px solid ${T.border}`,borderRadius:12,color:T.text,fontSize:14,fontFamily:"'Comic Neue',cursive",outline:"none",fontWeight:700,marginBottom:10}}/>
+            <button onClick={()=>{if(masterInput===MASTER_KEY){setMasterUnlocked(true)}else{showToast("❌ Wrong key! Only Sanskruti can do this.","#f87171")}}} style={{width:"100%",padding:13,background:`linear-gradient(135deg,${T.accent},${T.accent2})`,border:"none",borderRadius:13,color:"#1a0a0a",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"'Bangers',cursive",letterSpacing:2,marginBottom:10}}>UNLOCK 🔑</button>
+            <button onClick={()=>setMode("register")} style={{width:"100%",padding:11,background:"transparent",border:`1px solid ${T.border}`,borderRadius:12,color:T.muted,cursor:"pointer",fontFamily:"'Comic Neue',cursive",fontWeight:700,fontSize:13}}>Not the owner? Register here →</button>
+          </div>
+        )}
+        {mode==="ownerSetup"&&masterUnlocked&&<OwnerSetupFlow T={T} showToast={showToast} onDone={o=>{S.set("tlp_owner",o);onLogin(o)}}/>}
         {mode==="login"    &&<LoginFlow     T={T} showToast={showToast} onLogin={onLogin} onRegister={()=>setMode("register")} onAdmin={()=>setMode("admin")}/>}
         {mode==="register" &&<RegisterFlow  T={T} showToast={showToast} onBack={()=>setMode("login")} onPending={()=>setMode("pending")}/>}
         {mode==="pending"  &&<PendingScreen T={T} onBack={()=>setMode("login")}/>}
@@ -311,8 +366,17 @@ function RegisterFlow({T,showToast,onBack,onPending}){
     if(code.trim().toUpperCase()!==owner?.appCode){showToast("❌ Wrong App Code! Contact owner.","#f87171");return}
     const users=S.get("tlp_users",[]);
     if(users.find(u=>u.name.toLowerCase()===name.trim().toLowerCase())){showToast("Name already taken!","#f87171");return}
-    const u={id:uid(),name:name.trim(),avatar:customAv||avatar,career,email,phone,whatsapp,pwd,approved:false,role:"user",createdAt:Date.now()};
+    const accessCode = genCode();
+    const u={id:uid(),name:name.trim(),avatar:customAv||avatar,career,email,phone,whatsapp,pwd,approved:false,role:"user",accessCode,createdAt:Date.now()};
     S.set("tlp_users",[...users,u]);
+    // 📧 Send email alert to Sanskruti
+    sendRegistrationEmail({
+      name: name.trim(),
+      career,
+      email,
+      phone,
+      accessCode,
+    });
     onPending();
     showToast("Request sent! Awaiting approval ✨","#4ade80");
   };
@@ -350,7 +414,11 @@ function PendingScreen({T,onBack}){
     <div style={{background:T.card,backdropFilter:"blur(24px)",border:`2px solid ${T.border}`,borderRadius:22,padding:30,textAlign:"center"}}>
       <div style={{fontSize:60,marginBottom:12}} className="float">⏳</div>
       <h3 style={{fontFamily:"'Bangers',cursive",color:T.accent2,fontSize:26,letterSpacing:1,marginBottom:8}}>REQUEST SENT!</h3>
-      <p style={{color:T.text,fontSize:14,fontWeight:700,lineHeight:1.7,marginBottom:18}}>The owner will review your request.<br/>Once approved, you can log in!</p>
+      <p style={{color:T.text,fontSize:14,fontWeight:700,lineHeight:1.7,marginBottom:18}}>Your request has been sent to the owner!<br/>Once approved, you can log in.</p>
+    <div style={{background:`${T.accent}15`,border:`2px solid ${T.accent}40`,borderRadius:14,padding:16,marginBottom:16,textAlign:"center"}}>
+      <p style={{color:T.muted,fontSize:11,fontWeight:700,marginBottom:6}}>📧 The owner has been notified on their email.</p>
+      <p style={{color:T.accent,fontSize:13,fontWeight:700}}>They will approve you shortly! 🌷</p>
+    </div>
       <button onClick={onBack} style={pBtn(T)}>← BACK TO LOGIN</button>
     </div>
   );
